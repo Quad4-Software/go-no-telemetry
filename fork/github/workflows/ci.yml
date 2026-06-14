@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.6"
+
+      - name: Build Go toolchain
+        working-directory: src
+        run: GOROOT_BOOTSTRAP="$(go env GOROOT)" ./make.bash
+
+      - name: Verify build
+        run: |
+          ./bin/go version
+          test "$(./bin/go telemetry)" = "off"
+
+      - name: Verify fork
+        run: SKIP_BUILD=1 ./scripts/verify-fork.sh

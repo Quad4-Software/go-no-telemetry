@@ -1,0 +1,25 @@
+# Bootstrap build artifacts
+_bootstrap/
+_bootstrap/cc-wrap-*.sh
+
+# Source tarballs (too large for git, fetched via prefetch)
+bootstrap-tars/*.tar.gz
+
+# Go build artifacts
+/bin/
+/pkg/
+/VERSION.cache
+/src/cmd/dist/dist
+
+# Generated bootstrap files
+/src/cmd/cgo/zdefaultcc.go
+/src/cmd/go/internal/cfg/zdefaultcc.go
+/src/cmd/internal/objabi/zbootstrap.go
+/src/internal/buildcfg/zbootstrap.go
+/src/internal/runtime/sys/zversion.go
+/src/time/tzdata/zzipdata.go
+
+# Editor and OS files
+*.swp
+*~
+.DS_Store

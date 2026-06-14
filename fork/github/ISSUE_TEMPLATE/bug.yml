@@ -1,0 +1,47 @@
+name: Bug report
+description: Something is broken in this fork
+title: "area: short description"
+
+body:
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      description: Output of `go version` from this fork.
+      placeholder: go version go1.27-devel linux/amd64
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build-method
+    attributes:
+      label: How did you build or install?
+      options:
+        - bootstrap.sh install
+        - bootstrap.sh build
+        - src/make.bash with existing Go
+        - bootstrap.sh system
+        - Prebuilt binary or other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

@@ -1,0 +1,8 @@
+# Files removed by the no-telemetry fork (one repo-relative path per line).
+src/cmd/go/internal/telemetrystats/telemetrystats_bootstrap.go
+src/cmd/go/internal/telemetrystats/version_other.go
+src/cmd/go/internal/telemetrystats/version_unix.go
+src/cmd/go/internal/telemetrystats/version_windows.go
+src/cmd/internal/telemetry/telemetry_bootstrap.go
+src/cmd/internal/telemetry/counter/counter_bootstrap.go
+src/cmd/go/testdata/script/telemetry.txt
