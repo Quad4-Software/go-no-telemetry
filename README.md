@@ -103,13 +103,18 @@ git push origin v1.27.0
 
 The [Release workflow](.github/workflows/release.yml) builds for:
 
-| Platform | Archive |
-|----------|---------|
-| Linux amd64 | `go-no-telemtry-vX.Y.Z.linux-amd64.tar.gz` |
-| Linux arm64 | `go-no-telemtry-vX.Y.Z.linux-arm64.tar.gz` |
-| macOS amd64 | `go-no-telemtry-vX.Y.Z.darwin-amd64.tar.gz` |
-| macOS arm64 | `go-no-telemtry-vX.Y.Z.darwin-arm64.tar.gz` |
-| Windows amd64 | `go-no-telemtry-vX.Y.Z.windows-amd64.zip` |
+| OS | Architectures |
+|----|---------------|
+| Linux | amd64, arm64, armv6, armv7, 386, riscv64 |
+| FreeBSD | amd64, arm64, 386, arm, riscv64 |
+| OpenBSD | amd64, arm64, 386, arm, riscv64 |
+| NetBSD | amd64, arm64, 386, arm |
+| DragonFly BSD | amd64 |
+| macOS | amd64, arm64 |
+| Windows | amd64, arm64, 386 |
+
+Archives are named `go-no-telemtry-vX.Y.Z.<platform>.{tar.gz,zip}` (for example
+`go-no-telemtry-vX.Y.Z.linux-armv6.tar.gz`, `go-no-telemtry-vX.Y.Z.freebsd-riscv64.tar.gz`).
 
 Each release includes platform binaries, a source tarball, and `SHA256SUMS`.
 To install, extract the archive for your platform and add `go/bin` to your `PATH`.

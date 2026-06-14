@@ -13,7 +13,7 @@ if [ ! -d "$DIST" ]; then
 fi
 
 mkdir -p "$OUT"
-rm -f "$OUT"/go-no-telemtry-* "$OUT"/SHA256SUMS
+rm -f "$OUT"/go-no-telemtry-"${TAG}".* "$OUT"/SHA256SUMS
 
 for f in "$DIST"/*; do
     [ -f "$f" ] || continue
@@ -23,18 +23,28 @@ for f in "$DIST"/*; do
         *.src.tar.gz)
             cp "$f" "$OUT/go-no-telemtry-${TAG}.src.tar.gz"
             ;;
-        *.linux-*.tar.gz|*.darwin-*.tar.gz|*.freebsd-*.tar.gz|*.aix-*.tar.gz)
-            plat=$(echo "$base" | sed -E 's/^.*\.([a-z0-9]+-[a-z0-9]+)\.tar\.gz$/\1/')
-            cp "$f" "$OUT/go-no-telemtry-${TAG}.${plat}.tar.gz"
+        v0.0.1-*|*.mod|*.info)
             ;;
-        *.windows-*.zip)
-            plat=$(echo "$base" | sed -E 's/^.*\.([a-z0-9]+-[a-z0-9]+)\.zip$/\1/')
+        *.zip)
+            if [ -n "${PLATFORM:-}" ]; then
+                plat="$PLATFORM"
+            else
+                plat=$(echo "$base" | sed -E 's/^.*\.([a-z0-9]+-[a-z0-9]+)\.zip$/\1/')
+            fi
             cp "$f" "$OUT/go-no-telemtry-${TAG}.${plat}.zip"
+            ;;
+        *.tar.gz)
+            if [ -n "${PLATFORM:-}" ]; then
+                plat="$PLATFORM"
+            else
+                plat=$(echo "$base" | sed -E 's/^.*\.([a-z0-9]+-[a-z0-9]+)\.tar\.gz$/\1/')
+            fi
+            cp "$f" "$OUT/go-no-telemtry-${TAG}.${plat}.tar.gz"
             ;;
     esac
 done
 
-if ! ls "$OUT"/go-no-telemtry-* >/dev/null 2>&1; then
+if ! ls "$OUT"/go-no-telemtry-"${TAG}".* >/dev/null 2>&1; then
     echo "ERROR: no release artifacts produced in $OUT" >&2
     ls -la "$DIST" >&2 || true
     exit 1
@@ -42,7 +52,7 @@ fi
 
 (
     cd "$OUT"
-    sha256sum go-no-telemtry-* > SHA256SUMS
+    sha256sum go-no-telemtry-"${TAG}".* > SHA256SUMS
 )
 
 echo "Packaged release artifacts in $OUT:"

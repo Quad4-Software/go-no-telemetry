@@ -23,36 +23,50 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: linux-amd64
-            runner: ubuntu-latest
-            goos: linux
-            goarch: amd64
-            build: bash
-          - platform: linux-arm64
-            runner: ubuntu-24.04-arm
-            goos: linux
-            goarch: arm64
-            build: bash
-          - platform: darwin-amd64
-            runner: macos-13
-            goos: darwin
-            goarch: amd64
-            build: bash
-          - platform: darwin-arm64
-            runner: macos-latest
-            goos: darwin
-            goarch: arm64
-            build: bash
-          - platform: windows-amd64
-            runner: windows-latest
-            goos: windows
-            goarch: amd64
-            build: bat
+          # Linux
+          - { platform: linux-amd64, runner: ubuntu-latest, goos: linux, goarch: amd64, build: bash }
+          - { platform: linux-arm64, runner: ubuntu-latest, goos: linux, goarch: arm64, build: bash }
+          - { platform: linux-armv6, runner: ubuntu-latest, goos: linux, goarch: arm, goarm: "6", build: bash }
+          - { platform: linux-armv7, runner: ubuntu-latest, goos: linux, goarch: arm, goarm: "7", build: bash }
+          - { platform: linux-386, runner: ubuntu-latest, goos: linux, goarch: 386, build: bash }
+          - { platform: linux-riscv64, runner: ubuntu-latest, goos: linux, goarch: riscv64, build: bash }
+          # FreeBSD
+          - { platform: freebsd-amd64, runner: ubuntu-latest, goos: freebsd, goarch: amd64, build: bash }
+          - { platform: freebsd-arm64, runner: ubuntu-latest, goos: freebsd, goarch: arm64, build: bash }
+          - { platform: freebsd-386, runner: ubuntu-latest, goos: freebsd, goarch: 386, build: bash }
+          - { platform: freebsd-arm, runner: ubuntu-latest, goos: freebsd, goarch: arm, goarm: "7", build: bash }
+          - { platform: freebsd-riscv64, runner: ubuntu-latest, goos: freebsd, goarch: riscv64, build: bash }
+          # OpenBSD
+          - { platform: openbsd-amd64, runner: ubuntu-latest, goos: openbsd, goarch: amd64, build: bash }
+          - { platform: openbsd-arm64, runner: ubuntu-latest, goos: openbsd, goarch: arm64, build: bash }
+          - { platform: openbsd-386, runner: ubuntu-latest, goos: openbsd, goarch: 386, build: bash }
+          - { platform: openbsd-arm, runner: ubuntu-latest, goos: openbsd, goarch: arm, goarm: "7", build: bash }
+          - { platform: openbsd-riscv64, runner: ubuntu-latest, goos: openbsd, goarch: riscv64, build: bash }
+          # NetBSD
+          - { platform: netbsd-amd64, runner: ubuntu-latest, goos: netbsd, goarch: amd64, build: bash }
+          - { platform: netbsd-arm64, runner: ubuntu-latest, goos: netbsd, goarch: arm64, build: bash }
+          - { platform: netbsd-386, runner: ubuntu-latest, goos: netbsd, goarch: 386, build: bash }
+          - { platform: netbsd-arm, runner: ubuntu-latest, goos: netbsd, goarch: arm, goarm: "7", build: bash }
+          # DragonFly BSD
+          - { platform: dragonfly-amd64, runner: ubuntu-latest, goos: dragonfly, goarch: amd64, build: bash }
+          # macOS (native toolchains required)
+          - { platform: darwin-amd64, runner: macos-13, goos: darwin, goarch: amd64, build: bash }
+          - { platform: darwin-arm64, runner: macos-latest, goos: darwin, goarch: arm64, build: bash }
+          # Windows
+          - { platform: windows-amd64, runner: windows-latest, goos: windows, goarch: amd64, build: bat }
+          - { platform: windows-arm64, runner: windows-latest, goos: windows, goarch: arm64, build: bat }
+          - { platform: windows-386, runner: windows-latest, goos: windows, goarch: 386, build: bat }
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
+        if: matrix.build == 'bash'
+        with:
+          go-version: "1.24.6"
+
+      - uses: actions/setup-go@v5
+        if: matrix.build == 'bat'
         with:
           go-version: "1.24.6"
 
@@ -72,9 +86,17 @@ jobs:
       - name: Build and pack (Unix)
         if: matrix.build == 'bash'
         shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           cd src
           export GOROOT_BOOTSTRAP="$(go env GOROOT)"
+          export GOOS="$GOOS"
+          export GOARCH="$GOARCH"
+          if [ -n "${GOARM:-}" ]; then export GOARM="$GOARM"; fi
           ./make.bash -distpack
           ../bin/go version
           test "$(../bin/go telemetry)" = "off"
@@ -82,15 +104,23 @@ jobs:
       - name: Build and pack (Windows)
         if: matrix.build == 'bat'
         shell: cmd
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           cd src
           for /f "delims=" %%i in ('go env GOROOT') do set GOROOT_BOOTSTRAP=%%i
+          set GOOS=${{ matrix.goos }}
+          set GOARCH=${{ matrix.goarch }}
           call make.bat -distpack
           ..\bin\go version
           ..\bin\go telemetry | findstr /x "off"
 
       - name: Package artifacts
         shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
           chmod +x scripts/package-release.sh
           ./scripts/package-release.sh "$TAG"
