@@ -93,14 +93,10 @@ See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Releases
 
-Push a version tag to publish binaries:
-
-```sh
-git tag v1.27.0
-git push origin v1.27.0
-```
-
+Push a version tag to publish platform binaries.
 See [.github/workflows/release.yml](.github/workflows/release.yml).
+
+Offline kits are built locally only: `./scripts/make-offline-bundle.sh --tag v1.27.0 --releases ./release`
 
 ## Contributing
 

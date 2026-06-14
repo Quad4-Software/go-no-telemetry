@@ -111,14 +111,62 @@ The [Release workflow](.github/workflows/release.yml) builds for:
 | macOS arm64 | `go-no-telemtry-vX.Y.Z.darwin-arm64.tar.gz` |
 | Windows amd64 | `go-no-telemtry-vX.Y.Z.windows-amd64.zip` |
 
-Each release includes a source tarball and `SHA256SUMS`. To install, extract
-the archive and add `go/bin` to your `PATH`.
+Each release includes platform binaries, a source tarball, and `SHA256SUMS`.
+To install, extract the archive for your platform and add `go/bin` to your `PATH`.
 
 Manual release trigger: Actions -> Release -> Run workflow.
 
-## Contributing
+### Offline kit (local only)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Build them locally for air-gapped installs (USB transfer, etc.):
+
+| Contents | Purpose |
+|----------|---------|
+| `source/` | Fork source tree |
+| `bootstrap-tars/` | Upstream Go sources (go1.4 through go1.24.6) |
+| `bootstrap-bin/` | Official Go 1.24.6 binaries per platform |
+| `releases/` | Prebuilt go-no-telemtry binaries (copy from `./release/` after a local build) |
+
+**Create locally (connected machine):**
+
+```sh
+./bootstrap.sh prefetch
+./scripts/make-offline-bundle.sh --tag v1.27.0 --releases ./release
+```
+
+**Use on air-gapped machine:**
+
+Linux / macOS / Git Bash:
+
+```sh
+unzip go-no-telemtry-offline-v1.27.0.zip
+cd go-no-telemtry-offline-v1.27.0
+./install-offline-kit.sh verify
+./install-offline-kit.sh prebuilt prod
+export PATH="$HOME/.gonot/bin:$PATH"
+go telemetry   # off
+```
+
+Windows:
+
+```bat
+REM Right-click the .zip -> Extract All, or:
+powershell -Command "Expand-Archive -Path go-no-telemtry-offline-v1.27.0.zip -DestinationPath ."
+cd go-no-telemtry-offline-v1.27.0
+Setup.bat
+```
+
+Double-click `Setup.bat` for a graphical wizard (prebuilt or build from source).
+Or use `install-offline-kit.bat` from the command line.
+
+Then add `%USERPROFILE%\.gonot\bin` to your PATH (the wizard can do this automatically).
+
+**Optional:** On a connected Windows PC with [Inno Setup 6](https://jrsoftware.org/isinfo.php),
+build a single `Setup.exe` for the USB:
+
+```powershell
+.\scripts\build-windows-installer.ps1 -KitDir path\to\extracted-kit
+```
 
 ## License
 

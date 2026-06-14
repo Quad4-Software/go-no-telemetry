@@ -8,8 +8,13 @@ bootstrap-tars/*.tar.gz
 # Go build artifacts
 /bin/
 /pkg/
+/VERSION
 /VERSION.cache
 /release/
+/release-*/
+/release-toughpad/
+/go-no-telemtry-offline-*.zip
+/go-no-telemtry-offline-*.tar.gz
 /src/cmd/dist/dist
 
 # Generated bootstrap files
@@ -24,3 +29,5 @@ bootstrap-tars/*.tar.gz
 *.swp
 *~
 .DS_Store
+Thumbs.db
+desktop.ini

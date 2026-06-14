@@ -76,6 +76,8 @@ Environment:
   TARDIR          Source tarball directory (default: ./bootstrap-tars)
   GONOT_ROOT      Version manager root (default: ~/.gonot)
   FORK_DIR        Fork source path (default: repository root)
+  BUNDLE_ROOT     Offline kit root (uses bundled bootstrap Go when set)
+  FULL_BOOTSTRAP  Set to 1 to force clang -> go1.4 bootstrap chain
 
 Bootstrap chain for build:
   clang -> go1.4 -> go1.17.13 -> go1.20 -> go1.22.6 -> go1.24.6 -> fork
@@ -207,6 +209,34 @@ WRAP
     fi
 }
 
+# True when a bundled offline-kit bootstrap Go is available.
+bundled_bootstrap_ok() {
+    [ -n "${BUNDLE_ROOT:-}" ] || return 1
+    _plat="${BUNDLE_PLATFORM:-}"
+    if [ -z "$_plat" ]; then
+        _os=$(uname -s 2>/dev/null | tr '[:upper:]' '[:lower:]')
+        _arch=$(uname -m 2>/dev/null)
+        case "$_os" in
+            linux) _goos=linux ;;
+            darwin) _goos=darwin ;;
+            mingw*|msys*|cygwin*|windows*) _goos=windows ;;
+            *) _goos="$_os" ;;
+        esac
+        case "$_arch" in
+            x86_64|amd64) _goarch=amd64 ;;
+            aarch64|arm64) _goarch=arm64 ;;
+            *) _goarch="$_arch" ;;
+        esac
+        _plat="${_goos}-${_goarch}"
+    fi
+    _root="$BUNDLE_ROOT/bootstrap-bin/${_plat}/go"
+    if [ -x "$_root/bin/go" ] || [ -f "$_root/bin/go.exe" ]; then
+        BUNDLE_BOOTSTRAP="$_root"
+        return 0
+    fi
+    return 1
+}
+
 # True when a system Go toolchain can bootstrap this fork (>= Go 1.24.6).
 system_bootstrap_ok() {
     if ! command -v go >/dev/null 2>&1; then
@@ -222,15 +252,19 @@ system_bootstrap_ok() {
 build_fork_tree() {
     fork_src="$FORK_DIR"
     if [ -n "${BUILD_TAG:-}" ]; then
-        log "=== Checking out tag: $BUILD_TAG ==="
-        saved_dir=$(pwd)
-        cd "$fork_src"
-        git fetch --tags 2>/dev/null || true
-        git checkout "$BUILD_TAG" 2>/dev/null || {
-            log "ERROR: tag '$BUILD_TAG' not found"
-            exit 1
-        }
-        cd "$saved_dir"
+        if [ "$OFFLINE" = true ] || [ ! -d "$fork_src/.git" ]; then
+            log "Offline mode: building fork source as-is"
+        else
+            log "=== Checking out tag: $BUILD_TAG ==="
+            saved_dir=$(pwd)
+            cd "$fork_src"
+            git fetch --tags 2>/dev/null || true
+            git checkout "$BUILD_TAG" 2>/dev/null || {
+                log "ERROR: tag '$BUILD_TAG' not found"
+                exit 1
+            }
+            cd "$saved_dir"
+        fi
     fi
 
     log "=== Building go-no-telemetry fork ==="
@@ -254,6 +288,12 @@ build_fork_tree() {
 # Build the full bootstrap chain then our fork.
 # Returns the path to the built fork.
 build_fork() {
+    if [ "${FULL_BOOTSTRAP:-0}" != "1" ] && bundled_bootstrap_ok; then
+        log "=== Using bundled bootstrap Go ($BUNDLE_BOOTSTRAP) ==="
+        export GOROOT_BOOTSTRAP="$BUNDLE_BOOTSTRAP"
+        build_fork_tree
+        return
+    fi
     if [ "${FULL_BOOTSTRAP:-0}" != "1" ] && system_bootstrap_ok; then
         log "=== Using system Go for bootstrap ($(go version)) ==="
         log "  Set FULL_BOOTSTRAP=1 to build the full clang -> go1.4 chain"
