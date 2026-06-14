@@ -45,7 +45,7 @@ jobs:
           # DragonFly BSD
           - { platform: dragonfly-amd64, runner: ubuntu-latest, goos: dragonfly, goarch: amd64, build: bash, native: false }
           # macOS (native toolchains required)
-          - { platform: darwin-amd64, runner: macos-13, goos: darwin, goarch: amd64, build: bash, native: true }
+          - { platform: darwin-amd64, runner: macos-15-intel, goos: darwin, goarch: amd64, build: bash, native: true }
           - { platform: darwin-arm64, runner: macos-latest, goos: darwin, goarch: arm64, build: bash, native: true }
           # Windows
           - { platform: windows-amd64, runner: windows-latest, goos: windows, goarch: amd64, build: bat, native: true }
