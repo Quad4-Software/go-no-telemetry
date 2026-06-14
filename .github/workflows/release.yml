@@ -1,0 +1,148 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.27.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-amd64
+            runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            build: bash
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            build: bash
+          - platform: darwin-amd64
+            runner: macos-13
+            goos: darwin
+            goarch: amd64
+            build: bash
+          - platform: darwin-arm64
+            runner: macos-latest
+            goos: darwin
+            goarch: arm64
+            build: bash
+          - platform: windows-amd64
+            runner: windows-latest
+            goos: windows
+            goarch: amd64
+            build: bat
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.6"
+
+      - name: Set release version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          VER="go${TAG#v}"
+          printf '%s\n' "$VER" > VERSION
+          printf 'time %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> VERSION
+
+      - name: Build and pack (Unix)
+        if: matrix.build == 'bash'
+        shell: bash
+        run: |
+          cd src
+          export GOROOT_BOOTSTRAP="$(go env GOROOT)"
+          ./make.bash -distpack
+          ../bin/go version
+          test "$(../bin/go telemetry)" = "off"
+
+      - name: Build and pack (Windows)
+        if: matrix.build == 'bat'
+        shell: cmd
+        run: |
+          cd src
+          for /f "delims=" %%i in ('go env GOROOT') do set GOROOT_BOOTSTRAP=%%i
+          call make.bat -distpack
+          ..\bin\go version
+          ..\bin\go telemetry | findstr /x "off"
+
+      - name: Package artifacts
+        shell: bash
+        run: |
+          chmod +x scripts/package-release.sh
+          ./scripts/package-release.sh "$TAG"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: release/
+          if-no-files-found: error
+
+      - name: Upload source tarball
+        if: matrix.platform == 'linux-amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-src
+          path: release/go-no-telemtry-${{ env.TAG }}.src.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Collect release files
+        shell: bash
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name 'go-no-telemtry-*' -o -name 'SHA256SUMS' \) -exec cp {} release/ \;
+          cd release
+          sha256sum go-no-telemtry-* > SHA256SUMS
+          ls -la
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: go-no-telemtry ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          files: release/*

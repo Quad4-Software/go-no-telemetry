@@ -91,6 +91,17 @@ src/                  Go standard library and toolchain
 GitHub Actions builds with Go 1.24.6 bootstrap and verifies telemetry is off.
 See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
+## Releases
+
+Push a version tag to publish binaries:
+
+```sh
+git tag v1.27.0
+git push origin v1.27.0
+```
+
+See [.github/workflows/release.yml](.github/workflows/release.yml).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

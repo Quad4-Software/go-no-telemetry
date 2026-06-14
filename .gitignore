@@ -9,6 +9,7 @@ bootstrap-tars/*.tar.gz
 /bin/
 /pkg/
 /VERSION.cache
+/release/
 /src/cmd/dist/dist
 
 # Generated bootstrap files

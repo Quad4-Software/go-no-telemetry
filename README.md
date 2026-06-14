@@ -91,6 +91,31 @@ src/                  Go standard library and toolchain
 GitHub Actions builds with Go 1.24.6 bootstrap and verifies telemetry is off.
 See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
+## Releases
+
+Prebuilt binaries are published on [GitHub Releases](https://github.com/Quad4-Software/go-no-telemtry/releases)
+when a version tag is pushed:
+
+```sh
+git tag v1.27.0
+git push origin v1.27.0
+```
+
+The [Release workflow](.github/workflows/release.yml) builds for:
+
+| Platform | Archive |
+|----------|---------|
+| Linux amd64 | `go-no-telemtry-vX.Y.Z.linux-amd64.tar.gz` |
+| Linux arm64 | `go-no-telemtry-vX.Y.Z.linux-arm64.tar.gz` |
+| macOS amd64 | `go-no-telemtry-vX.Y.Z.darwin-amd64.tar.gz` |
+| macOS arm64 | `go-no-telemtry-vX.Y.Z.darwin-arm64.tar.gz` |
+| Windows amd64 | `go-no-telemtry-vX.Y.Z.windows-amd64.zip` |
+
+Each release includes a source tarball and `SHA256SUMS`. To install, extract
+the archive and add `go/bin` to your `PATH`.
+
+Manual release trigger: Actions -> Release -> Run workflow.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
