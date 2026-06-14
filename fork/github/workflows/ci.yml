@@ -6,27 +6,102 @@ on:
   pull_request:
     branches: [master, main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux (native runners where the built binary can execute)
+          - { platform: linux-amd64, runner: ubuntu-latest, goos: linux, goarch: amd64, build: bash, native: true, verify_fork: true }
+          - { platform: linux-arm64, runner: ubuntu-24.04-arm, goos: linux, goarch: arm64, build: bash, native: true }
+          - { platform: linux-armv6, runner: ubuntu-latest, goos: linux, goarch: arm, goarm: "6", build: bash, native: false }
+          - { platform: linux-armv7, runner: ubuntu-latest, goos: linux, goarch: arm, goarm: "7", build: bash, native: false }
+          - { platform: linux-386, runner: ubuntu-latest, goos: linux, goarch: 386, build: bash, native: false }
+          - { platform: linux-riscv64, runner: ubuntu-latest, goos: linux, goarch: riscv64, build: bash, native: false }
+          # FreeBSD
+          - { platform: freebsd-amd64, runner: ubuntu-latest, goos: freebsd, goarch: amd64, build: bash, native: false }
+          - { platform: freebsd-arm64, runner: ubuntu-latest, goos: freebsd, goarch: arm64, build: bash, native: false }
+          - { platform: freebsd-386, runner: ubuntu-latest, goos: freebsd, goarch: 386, build: bash, native: false }
+          - { platform: freebsd-arm, runner: ubuntu-latest, goos: freebsd, goarch: arm, goarm: "7", build: bash, native: false }
+          - { platform: freebsd-riscv64, runner: ubuntu-latest, goos: freebsd, goarch: riscv64, build: bash, native: false }
+          # OpenBSD
+          - { platform: openbsd-amd64, runner: ubuntu-latest, goos: openbsd, goarch: amd64, build: bash, native: false }
+          - { platform: openbsd-arm64, runner: ubuntu-latest, goos: openbsd, goarch: arm64, build: bash, native: false }
+          - { platform: openbsd-386, runner: ubuntu-latest, goos: openbsd, goarch: 386, build: bash, native: false }
+          - { platform: openbsd-arm, runner: ubuntu-latest, goos: openbsd, goarch: arm, goarm: "7", build: bash, native: false }
+          - { platform: openbsd-riscv64, runner: ubuntu-latest, goos: openbsd, goarch: riscv64, build: bash, native: false }
+          # NetBSD
+          - { platform: netbsd-amd64, runner: ubuntu-latest, goos: netbsd, goarch: amd64, build: bash, native: false }
+          - { platform: netbsd-arm64, runner: ubuntu-latest, goos: netbsd, goarch: arm64, build: bash, native: false }
+          - { platform: netbsd-386, runner: ubuntu-latest, goos: netbsd, goarch: 386, build: bash, native: false }
+          - { platform: netbsd-arm, runner: ubuntu-latest, goos: netbsd, goarch: arm, goarm: "7", build: bash, native: false }
+          # DragonFly BSD
+          - { platform: dragonfly-amd64, runner: ubuntu-latest, goos: dragonfly, goarch: amd64, build: bash, native: false }
+          # macOS (native toolchains required)
+          - { platform: darwin-amd64, runner: macos-13, goos: darwin, goarch: amd64, build: bash, native: true }
+          - { platform: darwin-arm64, runner: macos-latest, goos: darwin, goarch: arm64, build: bash, native: true }
+          # Windows
+          - { platform: windows-amd64, runner: windows-latest, goos: windows, goarch: amd64, build: bat, native: true }
+          - { platform: windows-arm64, runner: windows-latest, goos: windows, goarch: arm64, build: bat, native: true }
+          - { platform: windows-386, runner: windows-latest, goos: windows, goarch: 386, build: bat, native: true }
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
+        if: matrix.build == 'bash'
         with:
           go-version: "1.24.6"
 
-      - name: Build Go toolchain
-        working-directory: src
+      - uses: actions/setup-go@v5
+        if: matrix.build == 'bat'
+        with:
+          go-version: "1.24.6"
+
+      - name: Build and verify (Unix)
+        if: matrix.build == 'bash'
+        shell: bash
         env:
-          GOTOOLCHAIN: local
-        run: GOROOT_BOOTSTRAP="$(go env GOROOT)" ./make.bash
-
-      - name: Verify build
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
         run: |
-          ./bin/go version
-          test "$(./bin/go telemetry)" = "off"
+          cd src
+          export GOROOT_BOOTSTRAP="$(go env GOROOT)"
+          export GOOS="$GOOS"
+          export GOARCH="$GOARCH"
+          if [ -n "${GOARM:-}" ]; then export GOARM="$GOARM"; fi
+          ./make.bash
+          if [ "${{ matrix.native }}" = "true" ]; then
+            ../bin/go version
+            test "$(../bin/go telemetry)" = "off"
+          else
+            test -f ../bin/go
+          fi
 
-      - name: Verify fork
+      - name: Build and verify (Windows)
+        if: matrix.build == 'bat'
+        shell: cmd
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          cd src
+          for /f "delims=" %%i in ('go env GOROOT') do set GOROOT_BOOTSTRAP=%%i
+          set GOOS=${{ matrix.goos }}
+          set GOARCH=${{ matrix.goarch }}
+          call make.bat
+          ..\bin\go version
+          ..\bin\go telemetry | findstr /x "off"
+
+      - name: Verify fork overlays
+        if: matrix.verify_fork == true
         run: SKIP_BUILD=1 ./scripts/verify-fork.sh
