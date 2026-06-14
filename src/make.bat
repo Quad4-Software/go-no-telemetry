@@ -113,7 +113,7 @@ if x%1==x--dist-tool (
 :: Bootstrap installs a proper cmd/dist, built with the new toolchain.
 :: Throw ours, built with the bootstrap toolchain, away after bootstrap.
 .\cmd\dist\dist.exe bootstrap -a %* || exit /b 1
-del .\cmd\dist\dist.exe
+del /F .\cmd\dist\dist.exe 2>NUL
 goto :eof
 
 :: DO NOT ADD ANY NEW CODE HERE.

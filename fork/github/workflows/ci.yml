@@ -19,6 +19,8 @@ jobs:
 
       - name: Build Go toolchain
         working-directory: src
+        env:
+          GOTOOLCHAIN: local
         run: GOROOT_BOOTSTRAP="$(go env GOROOT)" ./make.bash
 
       - name: Verify build

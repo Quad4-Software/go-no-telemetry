@@ -91,6 +91,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           GOARM: ${{ matrix.goarm }}
           PLATFORM: ${{ matrix.platform }}
+          GOTOOLCHAIN: local
         run: |
           cd src
           export GOROOT_BOOTSTRAP="$(go env GOROOT)"
@@ -103,19 +104,20 @@ jobs:
 
       - name: Build and pack (Windows)
         if: matrix.build == 'bat'
-        shell: cmd
+        shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           PLATFORM: ${{ matrix.platform }}
+          GOTOOLCHAIN: local
         run: |
           cd src
-          for /f "delims=" %%i in ('go env GOROOT') do set GOROOT_BOOTSTRAP=%%i
-          set GOOS=${{ matrix.goos }}
-          set GOARCH=${{ matrix.goarch }}
-          call make.bat -distpack
-          ..\bin\go version
-          ..\bin\go telemetry | findstr /x "off"
+          export GOROOT_BOOTSTRAP="$(go env GOROOT)"
+          export GOOS="$GOOS"
+          export GOARCH="$GOARCH"
+          cmd //c "call make.bat -distpack"
+          ../bin/go version
+          test "$(../bin/go telemetry)" = "off"
 
       - name: Package artifacts
         shell: bash
