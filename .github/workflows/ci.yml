@@ -31,7 +31,6 @@ jobs:
           - { platform: freebsd-arm64, runner: ubuntu-latest, goos: freebsd, goarch: arm64, build: bash, native: false }
           - { platform: freebsd-386, runner: ubuntu-latest, goos: freebsd, goarch: 386, build: bash, native: false }
           - { platform: freebsd-arm, runner: ubuntu-latest, goos: freebsd, goarch: arm, goarm: "7", build: bash, native: false }
-          - { platform: freebsd-riscv64, runner: ubuntu-latest, goos: freebsd, goarch: riscv64, build: bash, native: false }
           # OpenBSD
           - { platform: openbsd-amd64, runner: ubuntu-latest, goos: openbsd, goarch: amd64, build: bash, native: false }
           - { platform: openbsd-arm64, runner: ubuntu-latest, goos: openbsd, goarch: arm64, build: bash, native: false }
@@ -73,6 +72,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           GOARM: ${{ matrix.goarm }}
+          GOTOOLCHAIN: local
         run: |
           cd src
           export GOROOT_BOOTSTRAP="$(go env GOROOT)"
@@ -89,18 +89,19 @@ jobs:
 
       - name: Build and verify (Windows)
         if: matrix.build == 'bat'
-        shell: cmd
+        shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          GOTOOLCHAIN: local
         run: |
           cd src
-          for /f "delims=" %%i in ('go env GOROOT') do set GOROOT_BOOTSTRAP=%%i
-          set GOOS=${{ matrix.goos }}
-          set GOARCH=${{ matrix.goarch }}
-          call make.bat
-          ..\bin\go version
-          ..\bin\go telemetry | findstr /x "off"
+          export GOROOT_BOOTSTRAP="$(go env GOROOT)"
+          export GOOS="$GOOS"
+          export GOARCH="$GOARCH"
+          cmd //c "call make.bat"
+          ../bin/go version
+          test "$(../bin/go telemetry)" = "off"
 
       - name: Verify fork overlays
         if: matrix.verify_fork == true

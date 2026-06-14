@@ -35,7 +35,6 @@ jobs:
           - { platform: freebsd-arm64, runner: ubuntu-latest, goos: freebsd, goarch: arm64, build: bash }
           - { platform: freebsd-386, runner: ubuntu-latest, goos: freebsd, goarch: 386, build: bash }
           - { platform: freebsd-arm, runner: ubuntu-latest, goos: freebsd, goarch: arm, goarm: "7", build: bash }
-          - { platform: freebsd-riscv64, runner: ubuntu-latest, goos: freebsd, goarch: riscv64, build: bash }
           # OpenBSD
           - { platform: openbsd-amd64, runner: ubuntu-latest, goos: openbsd, goarch: amd64, build: bash }
           - { platform: openbsd-arm64, runner: ubuntu-latest, goos: openbsd, goarch: arm64, build: bash }
