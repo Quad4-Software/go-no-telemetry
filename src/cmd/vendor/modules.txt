@@ -48,18 +48,7 @@ golang.org/x/sync/semaphore
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/telemetry v0.0.0-20260519152614-eab6ae52b5e2
 ## explicit; go 1.25.0
-golang.org/x/telemetry
-golang.org/x/telemetry/counter
-golang.org/x/telemetry/counter/countertest
-golang.org/x/telemetry/internal/config
-golang.org/x/telemetry/internal/configstore
-golang.org/x/telemetry/internal/counter
-golang.org/x/telemetry/internal/crashmonitor
-golang.org/x/telemetry/internal/mmap
-golang.org/x/telemetry/internal/telemetry
-golang.org/x/telemetry/internal/upload
 # golang.org/x/term v0.43.0
 ## explicit; go 1.25.0
 golang.org/x/term
