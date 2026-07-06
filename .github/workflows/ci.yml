@@ -46,24 +46,26 @@ jobs:
           - { platform: dragonfly-amd64, runner: ubuntu-latest, goos: dragonfly, goarch: amd64, build: bash, native: false }
           # macOS (native toolchains required)
           - { platform: darwin-amd64, runner: macos-15-intel, goos: darwin, goarch: amd64, build: bash, native: true }
-          - { platform: darwin-arm64, runner: macos-latest, goos: darwin, goarch: arm64, build: bash, native: true }
+          - { platform: darwin-arm64, runner: macos-15, goos: darwin, goarch: arm64, build: bash, native: true }
           # Windows
           - { platform: windows-amd64, runner: windows-latest, goos: windows, goarch: amd64, build: bat, native: true }
           - { platform: windows-arm64, runner: windows-latest, goos: windows, goarch: arm64, build: bat, native: true }
           - { platform: windows-386, runner: windows-latest, goos: windows, goarch: 386, build: bat, native: true }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: matrix.build == 'bash'
         with:
           go-version: "1.24.6"
+          cache: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: matrix.build == 'bat'
         with:
           go-version: "1.24.6"
+          cache: false
 
       - name: Build and verify (Unix)
         if: matrix.build == 'bash'
