@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Quad4-Software/go-no-telemtry/actions/workflows/ci.yml/badge.svg)](https://github.com/Quad4-Software/go-no-telemtry/actions/workflows/ci.yml)
 
-A fork of the Go programming language with all telemetry stripped.
+A fork of the Go programming language with all telemetry stripped. Updated from upstream weekly.
 
 No counter data is collected. No uploads are sent. The `go telemetry` command is
 a stub that always reports `off`. The `GOTELEMETRY` and `GOTELEMETRYDIR`
