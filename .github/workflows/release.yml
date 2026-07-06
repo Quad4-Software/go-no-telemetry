@@ -57,7 +57,19 @@ jobs:
           - { platform: windows-386, runner: windows-latest, goos: windows, goarch: 386, build: bat }
 
     steps:
+      - name: Resolve release tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: matrix.build == 'bash'
@@ -74,12 +86,6 @@ jobs:
       - name: Set release version
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
           VER="go${TAG#v}"
           printf '%s\n' "$VER" > VERSION
           printf 'time %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> VERSION
