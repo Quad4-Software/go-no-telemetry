@@ -7,18 +7,102 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v1.27.0)"
+        description: "Release tag (e.g. v1.27.0 or v1.27.0-rc1)"
         required: true
         type: string
+      release_type:
+        description: "Release channel"
+        required: true
+        type: choice
+        default: stable
+        options:
+          - stable
+          - prerelease
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  prepare:
+    name: Prepare release
+    if: github.event_name == 'workflow_dispatch' || github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      ref: ${{ steps.meta.outputs.ref }}
+      sha: ${{ steps.meta.outputs.sha }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            HEAD_SHA="$(git rev-parse HEAD)"
+
+            if ! echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+              echo "Invalid tag format: $TAG (expected e.g. v1.27.0 or v1.27.0-rc1)" >&2
+              exit 1
+            fi
+
+            if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+              EXISTING_SHA="$(git rev-parse "refs/tags/$TAG")"
+              if [ "$EXISTING_SHA" != "$HEAD_SHA" ]; then
+                echo "Tag $TAG already exists on $EXISTING_SHA, but HEAD is $HEAD_SHA" >&2
+                exit 1
+              fi
+              echo "Tag $TAG already exists on HEAD"
+              REF="refs/tags/$TAG"
+            else
+              REF="$HEAD_SHA"
+            fi
+
+            if [ "${{ inputs.release_type }}" = "prerelease" ]; then
+              PRERELEASE=true
+            else
+              PRERELEASE=false
+            fi
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            REF="$GITHUB_REF"
+            HEAD_SHA="$(git rev-parse HEAD)"
+            case "$TAG" in
+              *-rc*|*-beta*|*-alpha*|*-pre*|*-dev*)
+                PRERELEASE=true
+                ;;
+              *)
+                PRERELEASE=false
+                ;;
+            esac
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "ref=$REF"
+            echo "sha=$HEAD_SHA"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+
   build:
     name: ${{ matrix.platform }}
+    needs: prepare
+    if: github.event_name == 'workflow_dispatch' || github.actor != 'github-actions[bot]'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:
@@ -57,19 +141,9 @@ jobs:
           - { platform: windows-386, runner: windows-latest, goos: windows, goarch: 386, build: bat }
 
     steps:
-      - name: Resolve release tag
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-          fi
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          ref: ${{ needs.prepare.outputs.ref }}
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: matrix.build == 'bash'
@@ -151,18 +225,30 @@ jobs:
 
   release:
     name: Publish GitHub release
-    needs: build
+    needs: [prepare, build]
+    if: github.event_name == 'workflow_dispatch' || github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve tag
-        id: meta
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - name: Create and push tag
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          TAG="${{ needs.prepare.outputs.tag }}"
+          SHA="${{ needs.prepare.outputs.sha }}"
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 0
           fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$SHA" -m "Release $TAG"
+          git push origin "refs/tags/$TAG"
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -181,7 +267,9 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: go-no-telemtry ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: go-no-telemtry ${{ needs.prepare.outputs.tag }}
           generate_release_notes: true
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.prepare.outputs.prerelease != 'true' }}
           files: release/*
