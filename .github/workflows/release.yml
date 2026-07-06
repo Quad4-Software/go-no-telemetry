@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v1.27.0 or v1.27.0-rc1)"
+        description: "Release tag (e.g. v1.27.0). If taken, v1.27.0-YYYYMMDD-HHMMSS is used."
         required: true
         type: string
       release_type:
@@ -49,27 +49,28 @@ jobs:
           set -euo pipefail
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
+            BASE_TAG="${{ inputs.tag }}"
             HEAD_SHA="$(git rev-parse HEAD)"
+            TAG="$BASE_TAG"
 
-            if ! echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
-              echo "Invalid tag format: $TAG (expected e.g. v1.27.0 or v1.27.0-rc1)" >&2
+            if ! echo "$BASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+              echo "Invalid tag format: $BASE_TAG (expected e.g. v1.27.0 or v1.27.0-rc1)" >&2
               exit 1
             fi
 
-            if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
-              EXISTING_SHA="$(git rev-parse "refs/tags/$TAG")"
-              if [ "$EXISTING_SHA" != "$HEAD_SHA" ]; then
-                echo "Tag $TAG already exists on $EXISTING_SHA, but HEAD is $HEAD_SHA" >&2
-                exit 1
-              fi
-              echo "Tag $TAG already exists on HEAD"
-              REF="refs/tags/$TAG"
-            else
-              REF="$HEAD_SHA"
+            if git rev-parse "refs/tags/$BASE_TAG" >/dev/null 2>&1; then
+              SUFFIX="$(date -u +%Y%m%d-%H%M%S)"
+              TAG="${BASE_TAG}-${SUFFIX}"
+              while git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; do
+                sleep 1
+                SUFFIX="$(date -u +%Y%m%d-%H%M%S)"
+                TAG="${BASE_TAG}-${SUFFIX}"
+              done
+              echo "Tag $BASE_TAG already exists, using $TAG"
             fi
+            REF="$HEAD_SHA"
 
-            if [ "${{ inputs.release_type }}" = "prerelease" ]; then
+            if [ "${{ inputs.release_type }}" = "prerelease" ] || [ "$TAG" != "$BASE_TAG" ]; then
               PRERELEASE=true
             else
               PRERELEASE=false
@@ -160,7 +161,11 @@ jobs:
       - name: Set release version
         shell: bash
         run: |
-          VER="go${TAG#v}"
+          VERSION_TAG="$TAG"
+          if echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}-[0-9]{6}$'; then
+            VERSION_TAG="$(echo "$TAG" | sed -E 's/-[0-9]{8}-[0-9]{6}$//')"
+          fi
+          VER="go${VERSION_TAG#v}"
           printf '%s\n' "$VER" > VERSION
           printf 'time %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> VERSION
 
