@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v1.27.0). If taken, v1.27.0-YYYYMMDD-HHMMSS is used."
+        description: "Release tag matching src/go.mod (e.g. v1.27.0). If taken, appends -YYYYMMDD-HHMMSS."
         required: true
         type: string
       release_type:
@@ -35,6 +35,7 @@ jobs:
       tag: ${{ steps.meta.outputs.tag }}
       ref: ${{ steps.meta.outputs.ref }}
       sha: ${{ steps.meta.outputs.sha }}
+      version: ${{ steps.meta.outputs.version }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -48,6 +49,32 @@ jobs:
         run: |
           set -euo pipefail
 
+          GOMOD_VERSION="$(sed -n 's/^go //p' src/go.mod | head -1)"
+          if [ -z "$GOMOD_VERSION" ]; then
+            echo "Could not read go version from src/go.mod" >&2
+            exit 1
+          fi
+
+          tag_go_version() {
+            local t="$1"
+            if echo "$t" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}-[0-9]{6}$'; then
+              t="$(echo "$t" | sed -E 's/-[0-9]{8}-[0-9]{6}$//')"
+            fi
+            if ! echo "$t" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+'; then
+              echo "Invalid tag format: $1" >&2
+              exit 1
+            fi
+            echo "$t" | sed -E 's/^v([0-9]+\.[0-9]+)\..*/\1/'
+          }
+
+          version_string() {
+            local t="$1"
+            if echo "$t" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}-[0-9]{6}$'; then
+              t="$(echo "$t" | sed -E 's/-[0-9]{8}-[0-9]{6}$//')"
+            fi
+            echo "go${t#v}"
+          }
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             BASE_TAG="${{ inputs.tag }}"
             HEAD_SHA="$(git rev-parse HEAD)"
@@ -55,6 +82,13 @@ jobs:
 
             if ! echo "$BASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
               echo "Invalid tag format: $BASE_TAG (expected e.g. v1.27.0 or v1.27.0-rc1)" >&2
+              exit 1
+            fi
+
+            TAG_GO="$(tag_go_version "$BASE_TAG")"
+            if [ "$TAG_GO" != "$GOMOD_VERSION" ]; then
+              echo "Release tag $BASE_TAG targets Go $TAG_GO, but src/go.mod requires go $GOMOD_VERSION." >&2
+              echo "Use a v${GOMOD_VERSION}.x tag on this branch, or run from a branch tagged for Go $TAG_GO." >&2
               exit 1
             fi
 
@@ -79,6 +113,13 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/}"
             REF="$GITHUB_REF"
             HEAD_SHA="$(git rev-parse HEAD)"
+
+            TAG_GO="$(tag_go_version "$TAG")"
+            if [ "$TAG_GO" != "$GOMOD_VERSION" ]; then
+              echo "Release tag $TAG targets Go $TAG_GO, but src/go.mod requires go $GOMOD_VERSION." >&2
+              exit 1
+            fi
+
             case "$TAG" in
               *-rc*|*-beta*|*-alpha*|*-pre*|*-dev*)
                 PRERELEASE=true
@@ -89,10 +130,13 @@ jobs:
             esac
           fi
 
+          VERSION="$(version_string "$TAG")"
+
           {
             echo "tag=$TAG"
             echo "ref=$REF"
             echo "sha=$HEAD_SHA"
+            echo "version=$VERSION"
             echo "prerelease=$PRERELEASE"
           } >> "$GITHUB_OUTPUT"
 
@@ -161,12 +205,7 @@ jobs:
       - name: Set release version
         shell: bash
         run: |
-          VERSION_TAG="$TAG"
-          if echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}-[0-9]{6}$'; then
-            VERSION_TAG="$(echo "$TAG" | sed -E 's/-[0-9]{8}-[0-9]{6}$//')"
-          fi
-          VER="go${VERSION_TAG#v}"
-          printf '%s\n' "$VER" > VERSION
+          printf '%s\n' "${{ needs.prepare.outputs.version }}" > VERSION
           printf 'time %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> VERSION
 
       - name: Build and pack (Unix)
